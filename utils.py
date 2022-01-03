@@ -1,3 +1,6 @@
+import random
+
+
 # SHA-256 hash function (https://en.wikipedia.org/wiki/SHA-2)
 def H(msg):
     def int2bits(i, n=None):
@@ -172,3 +175,111 @@ def H(msg):
 
     # Produce the final hash value (big-endian):
     return int(''.join([h0, h1, h2, h3, h4, h5, h6, h7]), 2)
+
+
+# Euclidean algorithm (https://en.m.wikipedia.org/wiki/Euclidean_algorithm)
+def gcd(a, b):
+    while a != b:
+        if a > b:
+            a = a - b
+        else:
+            b = b - a
+    return a
+
+
+# multiplicative inverse using the extended Euclidean algorithm
+# (https://en.m.wikipedia.org/wiki/Extended_Euclidean_algorithm)
+def mult_inv(a, n):
+    t, newt = 0, 1
+    r, newr = n, a
+
+    while newr != 0:
+        quotient = r // newr
+        t, newt = newt, t - quotient * newt
+        r, newr = newr, r - quotient * newr
+
+    assert r <= 1, "a is not invertible"
+
+    return t if t >= 0 else t + n
+
+
+# modular exponentiation by squaring
+# (https://en.m.wikipedia.org/wiki/Modular_exponentiation)
+def mod_exp(base, exponent, modulus):
+    if modulus == 1:
+        return 0
+
+    result = 1
+    while exponent > 0:
+        if exponent % 2 == 1:
+            result = (result * base) % modulus
+        exponent = exponent >> 1
+        base = (base * base) % modulus
+
+    return result
+
+
+# deterministic primality test
+def is_prime_det(n):
+    d = 2
+    while d ** 2 < n:
+        if n % d == 0:
+            return False
+        d += 1
+    return True
+
+
+# Miller-Rabin probabilistic primality test
+# (https://en.m.wikipedia.org/wiki/Primality_test)
+def is_prime_prob(n, num_trials=64):
+    # if is_prime_prob(n) = False, then n is definitely not prime, whereas
+    # if is_prime_prob(n) = True, then n is prime with probability at least
+    # 1 - 4 ** (-num_trials)
+    s = 0
+    while ((n - 1) // (2 ** s)) % 2 == 0:
+        s += 1
+    d = (n - 1) // (2 ** s)
+    assert (2 ** s) * d + 1 == n
+
+    for _ in range(num_trials):
+        a = random.randrange(2, n - 1)
+        if (mod_exp(a, d, n) not in [1, n - 1]
+            and all([mod_exp(1, (2 ** r) * d, n) != n - 1 for r in range(s)])):
+            return False
+    return True
+
+
+def n_bit_prime(n, is_prime=is_prime_prob):
+    candidate = random.getrandbits(n)
+    while not is_prime(candidate):
+        candidate += 1
+    return candidate
+
+
+# RSA key generation, signing, and verification functions
+# (https://en.m.wikipedia.org/wiki/RSA_(cryptosystem))
+def G(n=512):
+    # n is the desired key length; 2048 or larger used in practice
+    p = n_bit_prime(n // 2 - 1)
+    q = n_bit_prime(n // 2 + 3)
+    n = p * q
+
+    lcm = lambda a, b: abs(a * b) // gcd(a, b)
+    lam = lcm(p-1, q-1)
+    
+    e = 65537
+    d = mult_inv(e, lam)
+    assert (e * d) % lam == 1
+
+    return (n, e), (n, d)
+
+def S(sk, msg):
+    n, d = sk
+    h = H(msg)
+    assert 0 <= h < n
+    sigma = mod_exp(h, d, n)
+    return sigma
+
+def V(pk, msg, sigma):
+    n, e = pk
+    return H(msg) == mod_exp(sigma, e, n)
