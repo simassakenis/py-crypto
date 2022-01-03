@@ -1,4 +1,5 @@
 from utils import H, gcd, mod_exp, G, S, V
+from transactions import generate_transactions
 
 if __name__ == '__main__':
     # from http://karpathy.github.io/2021/06/21/blockchain/
@@ -24,3 +25,10 @@ if __name__ == '__main__':
     pk, sk = G()
     sigma = S(sk, msg)
     assert V(pk, msg, sigma)
+
+    txs, bal = generate_transactions(M=1000, n=10, m=10)
+    print(f'transactions: {txs}')
+    print(f'final balance {bal}')
+    txs, bal = generate_transactions(M=1000, n=10, m=10, balances=bal)
+    print(f'new transactions: {txs}')
+    print(f'new final balance {bal}')
